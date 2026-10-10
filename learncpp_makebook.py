@@ -63,6 +63,11 @@ _session.mount("http://", HTTPAdapter(max_retries=_retry))
 
 
 # FUNCTIONS ----------------------------------------------------------------
+def _safe_filename(value: str) -> str:
+    """Replace characters that are invalid in Windows filenames."""
+    return re.sub(r'[<>:"/\\|?*\x00-\x1f]', "-", value).rstrip(" .")
+
+
 def _serialize_html(node) -> str:
     serialized = lxml_html.tostring(node, encoding="unicode")
     if isinstance(serialized, bytes):
@@ -209,9 +214,6 @@ tb["links"] = tb["href"].apply(
 )
 tb = tb.drop(columns=["href"])
 
-# Sanitize names: replace "/" with "-" (avoids filesystem issues)
-tb["name"] = tb["name"].str.replace("/", "-", regex=False)
-
 # Zero-padded index to keep chapters in the correct order in the book
 tb["index"] = [str(i + 1).zfill(4) for i in range(len(tb))]
 
@@ -224,7 +226,10 @@ print("** Starting downloads (STEP2)")
 
 for _, row in tb.iterrows():
     url = TUTORIAL_PAGE + row["links"]
-    dest = f"html_raw/{row['index']}---{row['chapter']}---{row['name']}.html"
+    filename = _safe_filename(
+        f"{row['index']}---{row['chapter']}---{row['name']}"
+    )
+    dest = os.path.join("html_raw", f"{filename}.html")
     print(f"  Downloading {row['chapter']} -> {dest}")
     r = _session.get(url, timeout=REQUEST_TIMEOUT)
     r.raise_for_status()
