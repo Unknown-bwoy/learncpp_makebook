@@ -63,6 +63,15 @@ _session.mount("http://", HTTPAdapter(max_retries=_retry))
 
 
 # FUNCTIONS ----------------------------------------------------------------
+def _serialize_html(node) -> str:
+    serialized = lxml_html.tostring(node, encoding="unicode")
+    if isinstance(serialized, bytes):
+        return serialized.decode("utf-8")
+    if isinstance(serialized, str):
+        return serialized
+    raise TypeError(f"Expected HTML serialization to return str or bytes, got {type(serialized).__name__}")
+
+
 def _parse_lxml_table(table_node) -> list[list[str]]:
     """Return a list-of-rows (each row is a list of cell text strings) for an lxml table element."""
     rows = []
@@ -114,11 +123,11 @@ def edit_html(file_in: str, file_out: str, images_dir: str) -> None:
     content_nodes = page.xpath('//div[contains(@class,"entry-content")]')
 
     title_html = (
-        lxml_html.tostring(title_nodes[0], encoding="unicode")
+        _serialize_html(title_nodes[0])
         if title_nodes else ""
     )
     content_html = (
-        lxml_html.tostring(content_nodes[0], encoding="unicode")
+        _serialize_html(content_nodes[0])
         if content_nodes else ""
     )
 
@@ -127,8 +136,8 @@ def edit_html(file_in: str, file_out: str, images_dir: str) -> None:
     if not title_nodes and not content_nodes:
         body_nodes = page.xpath("//body")
         fallback = (
-            lxml_html.tostring(body_nodes[0], encoding="unicode")
-            if body_nodes else lxml_html.tostring(page, encoding="unicode")
+            _serialize_html(body_nodes[0])
+            if body_nodes else _serialize_html(page)
         )
         # Unwrap the outer <body> tag so we get just the inner HTML
         fallback = re.sub(r'^<body[^>]*>', '', fallback, count=1)
